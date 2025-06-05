@@ -122,5 +122,5 @@ sys_ps(void)
 {
   int pid = 0;
   argint(0, &pid);
-  return ps(pid);
+  ps(pid);
 }

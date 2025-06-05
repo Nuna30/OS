@@ -1,3 +1,8 @@
+// OS hw-2
+extern int setnice(int, int);
+extern int getnice(int);
+extern void ps(int);
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID

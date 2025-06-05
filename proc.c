@@ -534,6 +534,7 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
 
 int
 setnice(int pid, int nice_value) {
@@ -541,7 +542,7 @@ setnice(int pid, int nice_value) {
   acquire(&ptable.lock);
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     if (p->pid == pid) {
-      p->nice_value = nice_value;
+      p->nice = nice_value;
       release(&ptable.lock);
       return 0;
     }
@@ -555,7 +556,7 @@ getnice(int pid) {
   struct proc *p;
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     if (p->pid == pid)
-      return p->nice_value;
+      return p->nice;
   }
   return -1;
 }
@@ -566,7 +567,7 @@ ps(int pid) {
   struct proc *p;
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     if (pid == 0 || p->pid == pid) {
-      cprintf("%d      %d       %2d      %-9s%s\n", p->pid, p->parent->pid, p->nice_value, p->name);
+      cprintf("%d      %d       %2d      %-9s%s\n", p->pid, p->parent->pid, p->nice, p->name);
     }
   }
 }
