@@ -5,5 +5,8 @@
 - The lower nice value, the higher priority
 - The highest priority process is selected for next running
 - Tiebreak: FIFO fashion
-
+## reference
 ![trap handling process](/images/capture_250605_131249.png)
+- The `kill()` used in the user program is generated through user.h and usys.S
+- The `kill()` used in the `sys_kill()` and The `kill()` used in the user program are not the same
+- This also applies to `fork()`, `setnice()`, `getnice()`, `ps()`, ...
