@@ -534,4 +534,39 @@ procdump(void)
     }
     cprintf("\n");
   }
+
+int
+setnice(int pid, int nice_value) {
+  struct proc *p;
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (p->pid == pid) {
+      p->nice_value = nice_value;
+      release(&ptable.lock);
+      return 0;
+    }
+  }  
+  release(&ptable.lock);
+  return -1;
+}
+
+int
+getnice(int pid) {
+  struct proc *p;
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (p->pid == pid)
+      return p->nice_value;
+  }
+  return -1;
+}
+
+void
+ps(int pid) {
+  cprintf("pid    ppid    prio    state   name\n");
+  struct proc *p;
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (pid == 0 || p->pid == pid) {
+      cprintf("%d      %d       %2d      %-9s%s\n", p->pid, p->parent->pid, p->nice_value, p->name);
+    }
+  }
 }
