@@ -542,6 +542,8 @@ procdump(void)
 
 int
 setnice(int pid, int nice_value) {
+  if (nice_value < 0 || nice_value > 40) 
+    return -1;
   struct proc *p;
   acquire(&ptable.lock);
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
