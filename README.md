@@ -42,3 +42,9 @@
 
   ![kill image](./images/kill.png)
 </details>
+<details>
+  <summary>How to print state</summary>
+
+  - There is a different appoach to implement printing process state
+  ![printing_state](./images/print_state.png)
+</details>
