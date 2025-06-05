@@ -24,6 +24,10 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 void yield(void);
+int setnice(int, int); // OS hw2
+int getnice(int); // OS hw2
+void ps(int); // OS hw2
+
 
 // ulib.c
 int stat(const char*, struct stat*);
