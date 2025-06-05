@@ -9,6 +9,11 @@
 - on the branch OS-hw3. not now.
 ## reference
 <details>
+  <summary>proc struct</summary>
+
+  ![proc_struct](./images/proc_struct.png)
+</details>
+<details>
   <summary>Trap Handling Process</summary>
   
   ![trap handling process](./images/capture_250605_131249.png)
@@ -31,4 +36,9 @@
 
       ![sys_sleep code](./images/sys_sleep_code.png)
     </details>
+</details>
+<details>
+  <summary>How to get the process corresponding to a given pid</summary>
+
+  ![kill image](./images/kill.png)
 </details>
