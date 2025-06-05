@@ -97,3 +97,10 @@ sys_yield(void)
   return 0;
 }
 
+int
+sys_setnice(void)
+{
+  int pid, nice_value;
+  setnice(pid, nice_value);
+  return 0;
+}
