@@ -53,11 +53,18 @@
 <details>
   <summary>minitop error1</summary>
 
-  - 예상치 못한 출력
+  - 예상치 못한 출력 <br>
   ![minitop error1](./images/minitop_error1.png)
-  - unused proc 예외처리 로직 추가
+  - unused proc 예외처리 로직 추가 <br>
   ![minitop_solution1](./images/minitop_solution1.png)
-  - userinit에 p->parent = p; 추가
+  - userinit에 p->parent = p; 추가 <br>
   ![minitop_solution1_2](./images/minitop_solution1_2.png)
   
+</details>
+<details>
+  <summary>scheduler error1</summary>
+
+  - scheduler 첫 완성 후 생긴 버그 <br>
+  ![scheduler_error1](./images/scheduler_error1.png)
+    
 </details>
