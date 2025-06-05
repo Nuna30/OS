@@ -48,3 +48,16 @@
   - There is a different appoach to implement printing process state
   ![printing_state](./images/print_state.png)
 </details>
+
+## Trouble Shooting
+<details>
+  <summary>minitop error1</summary>
+
+  - 예상치 못한 출력
+  ![minitop error1](./images/minitop_error1.png)
+  - unused proc 예외처리 로직 추가
+  ![minitop_solution1](./images/minitop_solution1.png)
+  - userinit에 p->parent = p; 추가
+  ![minitop_solution1_2](./images/minitop_solution1_2.png)
+  
+</details>
