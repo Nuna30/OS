@@ -166,6 +166,7 @@ mkfs: mkfs.c fs.h
 .PRECIOUS: %.o
 
 UPROGS=\
+  _minitop\
 	_cat\
 	_echo\
 	_forktest\
@@ -291,4 +292,3 @@ PROJECTNUM=2
 tarball:
 	make clean
 	tar --exclude='.git' -cvzf ../xv6-pnu-p$(PROJECTNUM).tar.gz ../xv6-pnu-p$(PROJECTNUM)
-

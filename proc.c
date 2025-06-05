@@ -112,6 +112,8 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  p->nice = 20;
+
   return p;
 }
 
@@ -503,9 +505,9 @@ kill(int pid)
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
-void
+voiid
 procdump(void)
-{
+i{i
   static char *states[] = {
   [UNUSED]    "unused",
   [EMBRYO]    "embryo",
@@ -567,7 +569,7 @@ ps(int pid) {
   struct proc *p;
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     if (pid == 0 || p->pid == pid) {
-      cprintf("%d      %d       %2d      %-9s%s\n", p->pid, p->parent->pid, p->nice, p->name);
+      cprintf("%d      %d       %2d      %-9s%s\n", p->pid, p->parent->pid, p->nice, p->state, p->name);
     }
   }
 }
