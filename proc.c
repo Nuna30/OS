@@ -154,6 +154,8 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+  p->parent = p;
+
   release(&ptable.lock);
 }
 
@@ -505,9 +507,9 @@ kill(int pid)
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
-voiid
+void
 procdump(void)
-i{i
+{
   static char *states[] = {
   [UNUSED]    "unused",
   [EMBRYO]    "embryo",
@@ -556,20 +558,36 @@ setnice(int pid, int nice_value) {
 int
 getnice(int pid) {
   struct proc *p;
+  acquire(&ptable.lock);
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-    if (p->pid == pid)
+    if (p->pid == pid) {
+      release(&ptable.lock);
       return p->nice;
+    }
   }
   return -1;
 }
 
 void
 ps(int pid) {
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [EMBRYO]    "embryo",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+  };
+
   cprintf("pid    ppid    prio    state   name\n");
+
   struct proc *p;
+  acquire(&ptable.lock);
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-    if (pid == 0 || p->pid == pid) {
-      cprintf("%d      %d       %2d      %-9s%s\n", p->pid, p->parent->pid, p->nice, p->state, p->name);
+    if (p->state != UNUSED && (pid == 0 || p->pid == pid)) {
+      cprintf("%d      %d       %d      %s %s\n",
+               p->pid, p->parent->pid, p->nice, states[p->state], p->name);
     }
   }
+  release(&ptable.lock);
 }
