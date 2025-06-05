@@ -318,6 +318,37 @@ wait(void)
   }
 }
 
+struct queue {
+  struct proc* procs[NPROC];
+  int head, tail;
+};
+
+void init_queue(struct queue* q, int head, int tail) {
+  q->head = head;
+  q->tail = tail;
+}
+
+void push(struct queue* q, struct proc* p) {
+  if (q->tail >= NPROC - 1) return;
+  int i;
+  for (i = 0; i <= q->tail; i++) {
+    if (p->nice >= q->procs[i]->nice) {
+      for (int j = i; j < q->tail; j++) 
+        q->procs[j + 1] = q->procs[j];
+    }
+  }
+  q->procs[i] = p;
+  q->tail++;
+}
+
+void pop(struct queue* q, int n) {
+  if (q->tail == 0) return;
+  else if (n > q->tail) return;
+  for (int i = n + 1; i <= q->tail; i++) 
+    q->procs[n - 1] = q->procs[i];
+  q->tail--;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -329,36 +360,46 @@ wait(void)
 void
 scheduler(void)
 {
+  static struct queue FIFO, PQ;
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
+
+  init_queue(&FIFO, 0, 0);
+  init_queue(&PQ, 0, 0);
   
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
+    // init queue every loop
+    struct queue PQ;
+    init_queue(&PQ, 0, 0);
+
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      if(p->state == UNUSED)
         continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
+      push(&PQ, p);
+    }   
     release(&ptable.lock);
+     
+    p = PQ.procs[PQ.tail];
+      
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
 
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
   }
 }
 
