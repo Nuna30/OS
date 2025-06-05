@@ -5,3 +5,5 @@
 - The lower nice value, the higher priority
 - The highest priority process is selected for next running
 - Tiebreak: FIFO fashion
+
+![trap handling process]("images/capture_250605_131249.png")
