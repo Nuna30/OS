@@ -101,6 +101,26 @@ int
 sys_setnice(void)
 {
   int pid, nice_value;
-  setnice(pid, nice_value);
-  return 0;
+  if (argint(0, &pid) < 0) 
+    return -1;
+  if (argint(1, &nice_value) < 0)
+    return -1;
+  return setnice(pid, nice_value);
+}
+
+int 
+sys_getnice(void)
+{
+  int pid;
+  if (argint(0, &pid) < 0)
+    return -1;
+  return getnice(pid);
+}
+
+void
+sys_ps(void)
+{
+  int pid = 0;
+  argint(0, &pid);
+  return ps(pid);
 }
