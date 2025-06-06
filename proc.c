@@ -367,14 +367,11 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
       if(p->state != RUNNABLE) continue;
 
-      if(highest == 0) highest = p;
+      if (highest == 0) highest = p;
       else if (p->nice < highest->nice) highest = p;
     }
   
-    if (highest == 0) {
-      release(&ptable.lock);
-      continue;
-    }
+    if (highest == 0) continue;
 
     p = highest;
        
@@ -385,14 +382,14 @@ scheduler(void)
     switchuvm(p);
     p->state = RUNNING;
 
-    release(&ptable.lock);
-
     swtch(&(c->scheduler), p->context);
     switchkvm();
 
     // Process is done running for now.
     // It should have changed its p->state before coming back.
     c->proc = 0;   
+
+    release(&ptable.lock);
   }
 }
 
@@ -439,7 +436,7 @@ forkret(void)
 {
   static int first = 1;
   // Still holding ptable.lock from scheduler.
-  //  release(&ptable.lock);
+  release(&ptable.lock);
 
   if (first) {
     // Some initialization functions must be run in the context
