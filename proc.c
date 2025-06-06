@@ -354,6 +354,7 @@ void
 scheduler(void)
 {
   struct proc *p;
+  struct proc *highest = 0;
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -361,23 +362,22 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
 
-    // init queue every loop
-    struct queue PQ;
-    init_queue(&PQ, 0, -1);
-
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-      push(&PQ, p);
-    }   
-    release(&ptable.lock);
-      
-    if (PQ.tail < 0) continue; 
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if(p->state != RUNNABLE) continue;
 
-    p = PQ.procs[PQ.tail];
-      
+      if(highest == 0) highest = p;
+      else if (p->nice < highest->nice) highest = p;
+    }
+  
+    if (highest == 0) {
+      release(&ptable.lock);
+      continue;
+    }
+
+    p = highest;
+       
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
@@ -385,12 +385,14 @@ scheduler(void)
     switchuvm(p);
     p->state = RUNNING;
 
+    release(&ptable.lock);
+
     swtch(&(c->scheduler), p->context);
     switchkvm();
 
     // Process is done running for now.
     // It should have changed its p->state before coming back.
-    c->proc = 0;
+    c->proc = 0;   
   }
 }
 
@@ -437,7 +439,7 @@ forkret(void)
 {
   static int first = 1;
   // Still holding ptable.lock from scheduler.
-  release(&ptable.lock);
+  //  release(&ptable.lock);
 
   if (first) {
     // Some initialization functions must be run in the context
