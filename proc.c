@@ -330,11 +330,12 @@ void init_queue(struct queue* q, int head, int tail) {
 
 void push(struct queue* q, struct proc* p) {
   if (q->tail >= NPROC - 1) return;
-  int i;
-  for (i = 0; i <= q->tail; i++) {
+  int i = 0;
+  for (; i <= q->tail; i++) {
     if (p->nice >= q->procs[i]->nice) {
-      for (int j = i; j < q->tail; j++) 
-        q->procs[j + 1] = q->procs[j];
+      for (int j = q->tail + 1; j > i; j--) 
+        q->procs[j] = q->procs[j - 1];
+      break;
     }
   }
   q->procs[i] = p;
@@ -345,7 +346,7 @@ void pop(struct queue* q, int n) {
   if (q->tail == 0) return;
   else if (n > q->tail) return;
   for (int i = n + 1; i <= q->tail; i++) 
-    q->procs[n - 1] = q->procs[i];
+    q->procs[i - 1] = q->procs[i];
   q->tail--;
 }
 
@@ -360,13 +361,9 @@ void pop(struct queue* q, int n) {
 void
 scheduler(void)
 {
-  static struct queue FIFO, PQ;
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-
-  init_queue(&FIFO, 0, 0);
-  init_queue(&PQ, 0, 0);
   
   for(;;){
     // Enable interrupts on this processor.
@@ -374,7 +371,7 @@ scheduler(void)
 
     // init queue every loop
     struct queue PQ;
-    init_queue(&PQ, 0, 0);
+    init_queue(&PQ, 0, -1);
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
