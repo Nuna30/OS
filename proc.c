@@ -342,14 +342,6 @@ void push(struct queue* q, struct proc* p) {
   q->tail++;
 }
 
-void pop(struct queue* q, int n) {
-  if (q->tail == 0) return;
-  else if (n > q->tail) return;
-  for (int i = n + 1; i <= q->tail; i++) 
-    q->procs[i - 1] = q->procs[i];
-  q->tail--;
-}
-
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
