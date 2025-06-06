@@ -354,48 +354,38 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct proc *highest = 0;
   struct cpu *c = mycpu();
-  int min_nice = -1;
   c->proc = 0;
-  
+
   for(;;){
-    // Enable interrupts on this processor.
     sti();
 
-    // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-      if(p->state != RUNNABLE) continue;
 
-      if (highest == 0 || p->nice < min_nice) {
-        highest = p;
+    struct proc *highest_priority_p = 0;
+    int min_nice = -1;
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+
+      if (highest_priority_p == 0 || p->nice < min_nice) {
+        highest_priority_p = p;
         min_nice = p->nice;
       }
-      
-      if (highest != 0) {
-        p = highest;
-        c->proc = p;
-        switchuvm(p);
-        p->state = RUNNING;
-        swtch(&(c->scheduler), p->context);
-        sleep(p);
-        c->proc = 0;
-      } else {
-        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-          if (p->state != RUNNABLE) continue;
-          c->proc = p;
-          switchuvm(p);
-          p->state = RUNNING;
-          swtch(&(c->scheduler), p->context);
-          sleep(p);
-          c->proc = 0;
-          goto found_process;
-        }
-      }
-      release(&ptable.lock);
-      continue;
-      release(&ptable.lock);
+    }
+
+    if (highest_priority_p != 0) {
+      p = highest_priority_p;
+
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      swtch(&(c->scheduler), p->context);
+      c->proc = 0;
+    }
+
+    release(&ptable.lock);
   }
 }
 
