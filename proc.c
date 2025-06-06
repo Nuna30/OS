@@ -356,6 +356,7 @@ scheduler(void)
   struct proc *p;
   struct proc *highest = 0;
   struct cpu *c = mycpu();
+  int min_nice = -1;
   c->proc = 0;
   
   for(;;){
@@ -367,18 +368,34 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
       if(p->state != RUNNABLE) continue;
 
-      c->proc = p;
-      switchuvm(p);
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      c->proc = 0;
-
-      if (highest == 0) highest = p;
-      else if (p->nice < highest->nice) highest = p;
-    }
-    release(&ptable.lock);
+      if (highest == 0 || p->nice < min_nice) {
+        highest = p;
+        min_nice = p->nice;
+      }
+      
+      if (highest != 0) {
+        p = highest;
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        swtch(&(c->scheduler), p->context);
+        sleep(p);
+        c->proc = 0;
+      } else {
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+          if (p->state != RUNNABLE) continue;
+          c->proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+          swtch(&(c->scheduler), p->context);
+          sleep(p);
+          c->proc = 0;
+          goto found_process;
+        }
+      }
+      release(&ptable.lock);
+      continue;
+      release(&ptable.lock);
   }
 }
 
