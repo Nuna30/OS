@@ -318,30 +318,6 @@ wait(void)
   }
 }
 
-struct queue {
-  struct proc* procs[NPROC];
-  int head, tail;
-};
-
-void init_queue(struct queue* q, int head, int tail) {
-  q->head = head;
-  q->tail = tail;
-}
-
-void push(struct queue* q, struct proc* p) {
-  if (q->tail >= NPROC - 1) return;
-  int i = 0;
-  for (; i <= q->tail; i++) {
-    if (p->nice >= q->procs[i]->nice) {
-      for (int j = q->tail + 1; j > i; j--) 
-        q->procs[j] = q->procs[j - 1];
-      break;
-    }
-  }
-  q->procs[i] = p;
-  q->tail++;
-}
-
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.

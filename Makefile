@@ -166,6 +166,7 @@ mkfs: mkfs.c fs.h
 .PRECIOUS: %.o
 
 UPROGS=\
+  _test2\
   _minitop\
 	_cat\
 	_echo\
