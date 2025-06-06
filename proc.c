@@ -338,21 +338,21 @@ scheduler(void)
 
     acquire(&ptable.lock);
 
-    struct proc *highest_priority_p = 0;
+    struct proc *highest = 0;
     int min_nice = -1;
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
 
-      if (highest_priority_p == 0 || p->nice < min_nice) {
-        highest_priority_p = p;
+      if (highest == 0 || p->nice < min_nice) {
+        highest = p;
         min_nice = p->nice;
       }
     }
 
-    if (highest_priority_p != 0) {
-      p = highest_priority_p;
+    if (highest = 0) {
+      p = highest;
 
       c->proc = p;
       switchuvm(p);
