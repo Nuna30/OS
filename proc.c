@@ -351,7 +351,7 @@ scheduler(void)
       }
     }
 
-    if (highest = 0) {
+    if (highest != 0) {
       p = highest;
 
       c->proc = p;
