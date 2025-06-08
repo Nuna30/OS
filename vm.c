@@ -250,27 +250,49 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 
 // os hw3
 int
+mappages_no_present(pde_t *pgdir, char *va, uint size, uint perm)
+{
+  pte_t *pte;
+  uint a;
+
+  for (a = PGROUNDDOWN((uint)va); a < (uint)va + size; a += PGSIZE) {
+    pte = walkpgdir(pgdir, (char*)a, 1); 
+    if (!pte)
+      return -1;
+    *pte = (0 | perm);
+  }
+  return 0;
+}
+
+int
 allocuvm_stack(pde_t *pgdir, uint oldsz, uint newsz)
 {
   char *mem;
-  uint a;
+  uint va;
+  uint stack_top_va = PGROUNDDOWN(KERNBASE - PGSIZE); 
+  uint stack_bottom_limit_va = PGROUNDDOWN(KERNBASE - newsz); 
 
-  if(newsz >= KERNBASE)
-    return 0;
-
-  a = PGROUNDUP(KERNBASE - PGSIZE);
+  if (newsz >= KERNBASE)
+    return 0; 
 
   mem = kalloc();
   if (mem == 0) {
-    cprintf("allocuvm_stack : kalloc failed for initial stack page\n");
+    cprintf("allocuvm_stack: kalloc failed for initial stack page\n");
     return 0;
   }
   memset(mem, 0, PGSIZE);
 
-  if (mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0) {
+  if (mappages(pgdir, (char*)stack_top_va, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0) {
     cprintf("allocuvm_stack: mappages failed for initial stack page\n");
     kfree(mem);
     return 0;
+  }
+
+  for (va = stack_top_va - PGSIZE; va >= stack_bottom_limit_va; va -= PGSIZE) {
+    if (mappages_no_present(pgdir, (char*)va, PGSIZE, PTE_W|PTE_U) < 0) {
+        cprintf("allocuvm_stack: failed to create non-present PTE for stack growth\n");
+        return 0;
+    }
   }
   return newsz;
 }
