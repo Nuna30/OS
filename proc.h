@@ -49,6 +49,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  uint stack_pages_allocated;  // 현재 할당된 스택 물리 페이지 수
+  uint max_stack_pages;        // 스택이 최대로 확장될 수 있는 페이지 수 (예: 4)
+  uint user_stack_bottom;      // 사용자 스택의 가장 낮은 가상 주소 (가드 페이지의 시작점)
+
 };
 
 // Process memory is laid out contiguously, low addresses first:
