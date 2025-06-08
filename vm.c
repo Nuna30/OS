@@ -410,31 +410,20 @@ copyuvm(pde_t *pgdir, uint sz)
   pte_t *pte;
   uint pa, i, flags;
   char *mem;
+  struct proc *curproc = myproc(); 
 
   if((d = setupkvm()) == 0)
     return 0;
+
+  uint stack_bottom_limit_va = KERNBASE - (curproc->max_stack_pages * PGSIZE);
+
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
-      panic("copyuvm: pte should exist");
-    if(!(*pte & PTE_P))
-      panic("copyuvm: page not present");
-    pa = PTE_ADDR(*pte);
-    flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto bad;
-    memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
-      goto bad;
-  }
-  return d;
+      panic("copyuvm: pte should exist"); 
 
-bad:
-  freevm(d);
-  return 0;
-}
-
-//PAGEBREAK!
-// Map user virtual address to kernel address.
+    if(!(*pte & PTE_P)) { 
+      if (i >= stack_bottom_limit_va && i < KERNBASE) {
+        pte_t *child_pte =
 char*
 uva2ka(pde_t *pgdir, char *uva)
 {
@@ -448,9 +437,6 @@ uva2ka(pde_t *pgdir, char *uva)
   return (char*)P2V(PTE_ADDR(*pte));
 }
 
-// Copy len bytes from p to user address va in page table pgdir.
-// Most useful when pgdir is not the current page table.
-// uva2ka ensures this only works for PTE_U pages.
 int
 copyout(pde_t *pgdir, uint va, void *p, uint len)
 {
