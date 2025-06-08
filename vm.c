@@ -10,6 +10,48 @@
 extern char data[];  // defined by kernel.ld
 pde_t *kpgdir;  // for use in scheduler()
 
+// os hw3
+void pagefault(void)
+{
+    uint va = rcr2(); 
+    struct proc *p = myproc();
+
+    uint max_stack_bottom_va = p->user_stack_bottom;
+
+    if (PGROUNDDOWN(va) < KERNBASE &&
+        PGROUNDDOWN(va) >= max_stack_bottom_va &&
+        p->stack_pages_allocated < p->max_stack_pages)
+    {
+        pte_t *pte = walkpgdir(p->pgdir, (char*)PGROUNDDOWN(va), 0);
+        if (pte && (*pte & PTE_P)) {
+            cprintf("[Pagefault] Invalid access! (already present page: va=0x%x pid=%d)\n", va, p->pid);
+            p->killed = 1;
+            return;
+        }
+        char *mem = kalloc();
+        if (mem == 0) {
+            cprintf("[Pagefault] Invalid access! (kalloc failed during stack growth: pid=%d, va=0x%x)\n", p->pid, va);
+            p->killed = 1;
+            return;
+        }
+        memset(mem, 0, PGSIZE); 
+        if (mappages(p->pgdir, (char*)PGROUNDDOWN(va), PGSIZE, V2P(mem), PTE_W|PTE_U|PTE_P) < 0) {
+            cprintf("[Pagefault] Invalid access! (mappages failed during stack growth: pid=%d, va=0x%x)\n", p->pid, va);
+            kfree(mem);
+            p->killed = 1;
+            return;
+        }
+
+        p->stack_pages_allocated++; 
+        cprintf("[Pagefault] Allocate new page! (pid=%d, current pages=%d, fault_va=0x%x)\n", p->pid, p->stack_pages_allocated, PGROUNDDOWN(va));
+        lcr3(V2P(p->pgdir));
+        return; 
+    }
+
+    cprintf("[Pagefault] Invalid access! (Stack Overflow or access outside stack region: va=0x%x pid=%d)\n", va, p->pid);
+    p->killed = 1;
+}
+
 // Set up CPU's kernel segment descriptors.
 // Run once on entry on each CPU.
 void
