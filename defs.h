@@ -177,7 +177,9 @@ void            kvmalloc(void);
 pde_t*          setupkvm(void);
 char*           uva2ka(pde_t*, char*);
 int             allocuvm(pde_t*, uint, uint);
+// os-hw3
 int             allocuvm_stack(pde_t *pgdir, uint oldsz, uint newsz);
+void            pagefault(void);
 int             deallocuvm(pde_t*, uint, uint);
 void            freevm(pde_t*);
 void            inituvm(pde_t*, char*, uint);
