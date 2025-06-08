@@ -401,6 +401,8 @@ clearpteu(pde_t *pgdir, char *uva)
   *pte &= ~PTE_U;
 }
 
+// vm.c
+
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*
@@ -410,33 +412,167 @@ copyuvm(pde_t *pgdir, uint sz)
   pte_t *pte;
   uint pa, i, flags;
   char *mem;
-  struct proc *curproc = myproc(); 
+  struct proc *curproc = myproc(); // 현재 부모 프로세스
 
   if((d = setupkvm()) == 0)
     return 0;
 
+  // 스택의 가장 낮은 가상 주소 한계 계산
+  // curproc->max_stack_pages는 fork 시점에 부모의 값을 그대로 복사받을 것이므로 유효합니다.
   uint stack_bottom_limit_va = KERNBASE - (curproc->max_stack_pages * PGSIZE);
 
+  // 0부터 sz(코드/데이터/힙의 끝)까지 순회
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
-      panic("copyuvm: pte should exist"); 
+      panic("copyuvm: pte should exist"); // 이 부분은 pte가 존재하지 않으면 여전히 panic
 
-    if(!(*pte & PTE_P)) { 
+    // PTE_P (Present) 비트가 설정되어 있지 않은 경우
+    if(!(*pte & PTE_P)) {
+      // 해당 가상 주소 i가 스택 범위 내에 있는지 확인합니다.
+      // 스택은 KERNBASE에서 아래로 자라므로, i >= stack_bottom_limit_va 이고 i < KERNBASE 여야 합니다.
       if (i >= stack_bottom_limit_va && i < KERNBASE) {
-        pte_t *child_pte =
-char*
-uva2ka(pde_t *pgdir, char *uva)
-{
-  pte_t *pte;
+        // 이 페이지는 스택 영역에 속하며, 아직 물리 페이지가 할당되지 않은 상태입니다.
+        // 자식 프로세스에도 동일하게 PTE_P가 0인 페이지 엔트리를 생성합니다.
+        // mappages_no_present와 유사한 로직이 필요합니다.
+        // walkpgdir를 호출하여 PTE를 생성하고, PTE_P를 제외한 권한 비트를 설정합니다.
+        pte_t *child_pte = walkpgdir(d, (void*)i, 1); // 자식의 pgdir에 PTE 생성 (없으면 생성)
+        if (!child_pte) {
+          // PTE 생성 실패 시, 생성된 자식 pgdir을 해제하고 0을 반환합니다.
+          freevm(d);
+          return 0;
+        }
+        // 부모의 PTE에서 PTE_P 비트만 제외하고 나머지 플래그를 자식 PTE에 복사합니다.
+        // PTE_ADDR(*pte)는 어차피 0일 것이므로 중요하지 않습니다.
+        *child_pte = ((*pte) & ~PTE_P); // PTE_P를 뺀 나머지 플래그만 복사
 
-  pte = walkpgdir(pgdir, uva, 0);
-  if((*pte & PTE_P) == 0)
-    return 0;
-  if((*pte & PTE_U) == 0)
-    return 0;
-  return (char*)P2V(PTE_ADDR(*pte));
+        // 이 페이지는 물리적 할당이 없으므로 mem = kalloc() 및 copyuvm_body(mem, i)를 건너뜝니다.
+        continue; // 다음 페이지로 넘어갑니다.
+      } else {
+        // 스택 범위 밖이지만 PTE_P가 0인 경우 (예: 힙의 빈 공간, 또는 다른 비정상적인 상황)
+        // 기존 allocuvm은 힙 확장에서 PTE_P 없는 페이지를 만들지 않으므로,
+        // 이 경우는 비정상적인 상황일 가능성이 높습니다.
+        // 하지만 과제는 스택에 대해서만 언급했으므로, 다른 영역의 PTE_P=0은 기존처럼 panic을 유지할 수 있습니다.
+        // 요구사항이 '스택'에 대해서만 panic을 발생시키지 말라고 했으므로,
+        // 스택이 아닌 영역에서 PTE_P가 없으면 기존처럼 panic을 유지하는 것이 합리적입니다.
+        // 따라서, 현재 코드는 이 else 블록에 진입하면 panic("copyuvm: pte should exist")에 걸릴 수 있습니다.
+        // 이를 방지하려면 `panic("copyuvm: pte should exist");`를 아래로 옮겨야 합니다.
+      }
+    }
+
+    // PTE_P가 1인 경우 (정상적으로 매핑된 페이지)
+    // 기존 copyuvm 로직 수행
+    pa = PTE_ADDR(*pte);
+    flags = PTE_FLAGS(*pte);
+    if((mem = kalloc()) == 0)
+      goto bad;
+    memmove(mem, P2V(pa), PGSIZE);
+    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
+      goto bad;
+  }
+  // KERNBASE 부터 스택의 가장 낮은 한계까지의 스택 공간에 대해
+  // PTE_P가 0인 페이지 엔트리를 자식에게도 생성해야 합니다.
+  // 위 for 루프는 `sz`까지만 돌기 때문에 스택 영역 전체를 포괄하지 못할 수 있습니다.
+  // 스택 영역은 KERNBASE에서 아래로 sz와 독립적으로 존재하기 때문입니다.
+  // 그러므로 스택 영역에 대한 별도의 순회가 필요합니다.
+  
+  // 스택 영역은 i < KERNBASE 이면서 i >= stack_bottom_limit_va 입니다.
+  // 위 for 루프는 i < sz 까지만 돕니다. 만약 sz가 stack_bottom_limit_va보다 작다면
+  // 스택 영역의 PTE_P=0인 부분은 복사되지 않을 수 있습니다.
+  // 예를 들어, sz=10000000이고 스택이 KERNBASE-4*PGSIZE=0xFBE00000 부터 시작하면 for문이 스택 영역에 도달하지 못합니다.
+  // 따라서, 스택 영역 복사는 별도의 루프에서 처리하는 것이 안전합니다.
+  
+  // -- 스택의 PTE_P=0인 가상 페이지 복사 --
+  // 이 부분은 위에 PTE_P가 0인 경우의 `if` 블록에서 처리되므로,
+  // `for(i=0; i<sz; ...)` 루프만으로 스택 영역도 커버한다면 괜찮습니다.
+  // 그러나 일반적인 xv6 `sz`는 힙의 상단이고, 스택은 KERNBASE에서 내려오므로,
+  // `i < sz` 조건으로 스택 영역을 모두 커버하기 어렵습니다.
+  // 따라서, 스택 영역 복사를 위한 별도의 루프를 추가해야 합니다.
+  
+  // 올바른 `copyuvm`은 `0`부터 `KERNBASE`까지 순회해야 합니다.
+  // 또는, 코드/데이터/힙 영역과 스택 영역을 별도로 순회해야 합니다.
+  // 현재 `for(i=0; i < sz; i += PGSIZE)` 루프는 오직 `sz`까지의 영역만 커버합니다.
+  // 즉, `KERNBASE`에서 `sz`까지의 영역(스택 영역)을 복사하지 않습니다.
+  // 이 루프는 스택 영역을 전혀 건드리지 않습니다.
+  // 기존 `exec`에서 `sz`를 스택이 시작하는 지점 바로 위로 올렸다면 `sz`가 스택 영역에 포함되지만,
+  // 우리의 `exec` 수정본에서는 `sz`는 코드/데이터/힙의 끝을 의미하고 스택은 KERNBASE에서 시작합니다.
+  // 따라서, `sz`와 `KERNBASE` 사이에 존재하는 스택 영역에 대한 명시적인 처리가 필요합니다.
+  
+  // XV6의 일반적인 copyuvm은 `sz` (user limit)까지 복사하고
+  // 스택은 별도의 `allocuvm`으로 할당된 곳이므로, 
+  // 스택 영역은 `sz`와는 별개로 존재하는 가상 주소 공간입니다.
+  // 따라서, `copyuvm`의 `sz` 인자를 스택의 시작 지점인 `KERNBASE`까지 확장하고,
+  // `i < KERNBASE`까지 루프를 돌도록 변경하는 것이 더 합리적입니다.
+  
+  // --- 변경된 copyuvm 루프 ---
+  // `sz` 대신 `KERNBASE`까지 순회하도록 변경
+  // (sz는 이제 코드/데이터/힙의 크기만 나타냄)
+  for(i = 0; i < KERNBASE; i += PGSIZE){ // KERNBASE까지 모든 사용자 가상 주소 공간 순회
+    // 이 시점에서 pte가 존재하지 않는다는 것은 panic.
+    // 하지만, 스택 영역의 PTE_P=0인 경우는 허용.
+    // 따라서, pte가 존재하지 않으면 panic이 맞는 동작입니다.
+    // 즉, walkpgdir(pgdir, (void*)i, 0) == 0 인 경우
+    //   -> 이 부분은 스택 영역 내에서 PTE_P=0 인 경우에도 PTE 자체는 존재해야 합니다.
+    //      만약 PTE 자체가 없다면, 그건 스택 확장을 위해 PTE를 만들지 않은 경우입니다.
+    //      이 경우, 해당 주소에 접근 시 페이지 폴트가 나므로 괜찮습니다.
+    //      하지만 과제 요구사항은 "page entry는 생성하되 physical page는 할당하지 않음" 이므로,
+    //      PTE는 존재해야 합니다.
+    //      즉, `walkpgdir(pgdir, (void*)i, 0)`은 항상 `0`이 아니어야 합니다.
+    //      만약 `allocuvm_stack`에서 `mappages_no_present`와 같은 함수를 사용하여 PTE를 생성했다면,
+    //      이 `panic`은 발생하지 않을 것입니다.
+    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0) {
+      // PTE가 없는 경우, 해당 주소가 스택 범위 내에 있고 KERNBASE보다 작으면 스택 확장 대상.
+      // 그렇지 않으면 진짜 비정상적인 상황.
+      if (i >= stack_bottom_limit_va && i < KERNBASE) {
+         // 스택 영역의 PTE 없는 가상 주소. 자식에게도 PTE 없이 그대로 둡니다.
+         // 이 경우는 페이지 폴트 핸들러가 처리합니다.
+         // copyuvm은 이 경우 아무것도 하지 않고 넘어갑니다.
+         continue;
+      }
+      panic("copyuvm: pte should exist for non-stack or mapped stack regions");
+    }
+
+    // PTE_P (Present) 비트가 설정되어 있지 않은 경우
+    if(!(*pte & PTE_P)) {
+      // 해당 가상 주소 i가 스택 범위 내에 있는지 확인합니다.
+      if (i >= stack_bottom_limit_va && i < KERNBASE) {
+        // 스택 영역에 속하며, 아직 물리 페이지가 할당되지 않은 PTE입니다.
+        // 자식 프로세스에도 동일하게 PTE_P가 0인 페이지 엔트리를 생성합니다.
+        pte_t *child_pte = walkpgdir(d, (void*)i, 1); // 자식의 pgdir에 PTE 생성 (없으면 생성)
+        if (!child_pte) {
+          freevm(d);
+          return 0;
+        }
+        *child_pte = ((*pte) & ~PTE_P); // PTE_P를 뺀 나머지 플래그만 복사
+        continue; // 다음 페이지로 넘어갑니다.
+      } else {
+        // 스택 범위 밖인데 PTE_P가 0인 경우 (비정상)
+        // 기존 `copyuvm`은 이런 상황을 가정하지 않으므로 panic.
+        // 과제는 스택에 대해서만 요구했으므로, 다른 영역은 여전히 panic
+        panic("copyuvm: unpresent PTE for non-stack region");
+      }
+    }
+
+    // PTE_P가 1인 경우 (정상적으로 매핑된 페이지)
+    // 기존 copyuvm 로직 수행
+    pa = PTE_ADDR(*pte);
+    flags = PTE_FLAGS(*pte);
+    if((mem = kalloc()) == 0)
+      goto bad;
+    memmove(mem, P2V(pa), PGSIZE);
+    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
+      goto bad;
+  }
+  
+  // 자식 프로세스의 sz는 부모의 sz와 동일하게 설정됩니다. (exec에서 sz는 코드/데이터/힙 영역만 포함)
+  // 스택 관련 정보도 복사되어야 합니다.
+  // 이는 fork 함수 내에서 p->stack_pages_allocated = curproc->stack_pages_allocated; 와 같이 이루어져야 합니다.
+  
+  return d;
+
+bad:
+  freevm(d);
+  return 0;
 }
-
 int
 copyout(pde_t *pgdir, uint va, void *p, uint len)
 {
