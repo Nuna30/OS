@@ -224,13 +224,13 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   char *mem;
   uint a;
 
-  if(newsz >= kernbase)
+  if(newsz >= KERNBASE)
     return 0;
   if(newsz < oldsz)
     return oldsz;
 
-  a = pgroundup(oldsz);
-  for(; a < newsz; a += pgsize){
+  a = PGROUNDUP(oldsz);
+  for(; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
       cprintf("allocuvm out of memory\n");
@@ -238,7 +238,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       return 0;
     }
     memset(mem, 0, pgsize);
-    if(mappages(pgdir, (char*)a, pgsize, v2p(mem), pte_w|pte_u) < 0){
+    if(mappages(pgdir, (char*)a, pgsize, V2P(mem), PTE_W|PTE_U) < 0){
       cprintf("allocuvm out of memory (2)\n");
       deallocuvm(pgdir, newsz, oldsz);
       kfree(mem);
