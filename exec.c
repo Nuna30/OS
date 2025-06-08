@@ -1,3 +1,4 @@
+// exec.c
 #include "types.h"
 #include "param.h"
 #include "memlayout.h"
@@ -39,7 +40,7 @@ exec(char *path, char **argv)
     goto bad;
 
   // Load program into memory.
-  sz = 0;
+  sz = 0; 
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -60,19 +61,22 @@ exec(char *path, char **argv)
   end_op();
   ip = 0;
 
-  // Allocate two pages at the next page boundary.
-  // Make the first inaccessible.  Use the second as the user stack.
-  sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
-    goto bad;
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
-  sp = sz;
+  if (allocuvm_stack(pgdir, 0, 4 * PGSIZE) == 0) { 
+      cprintf("exec: allocuvm_stack failed\n");
+      goto bad;
+  }
 
-  // Push argument strings, prepare rest of stack in ustack.
+  curproc->stack_pages_allocated = 1;
+  curproc->max_stack_pages = 4;
+  curproc->user_stack_bottom = KERNBASE - (curproc->max_stack_pages * PGSIZE); 
+
+  sp = KERNBASE;
+
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
       goto bad;
-    sp = (sp - (strlen(argv[argc]) + 1)) & ~3;
+    sp = (sp - (strlen(argv[argc]) + 1));
+    sp = sp & ~3;
     if(copyout(pgdir, sp, argv[argc], strlen(argv[argc]) + 1) < 0)
       goto bad;
     ustack[3+argc] = sp;
@@ -98,12 +102,12 @@ exec(char *path, char **argv)
   curproc->pgdir = pgdir;
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
-  curproc->tf->esp = sp;
+  curproc->tf->esp = sp; 
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;
 
- bad:
+bad:
   if(pgdir)
     freevm(pgdir);
   if(ip){
